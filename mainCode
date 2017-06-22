@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width">
+    <title>repl.it</title>
+    <style>
+    form{
+      font-family: "Lucida Sans Unicode";
+    }
+    span{
+      font-family: "Lucida Sans Unicode";
+    }
+    input[type=number] {
+    border: 2px solid black;
+    border-radius: 4px;
+}
+    h1{
+      font-family: "Impact";
+      border-bottom: 8px solid #FF0000;
+      
+    }
+    body {
+      background-color: silver;
+    }
+.bigButton {
+    background-color: #FF0000;
+    border: outset;
+    color: white;
+    padding: 15px 32px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 25px;
+}
+.smallButton {
+    background-color: #FF0000;
+    border: outset;
+    color: white;
+    padding: 2px 8px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
+    font-size: 16px;
+    margin: 4px 2px;
+    cursor: pointer;
+    border-radius: 25px;
+}
+</style>
+    
+  </head>
+  <body>
+    
+  <h1>ROI Analysis Calculator</h1>
+    <form>
+  Individual Benefit Estimate:<br>
+  <input type="number" name="individualBenefitEst" id="individualBenefitEst"><button class="smallButton" id= "sumBenEst" onclick="sumGenerator(indivBenefitEstArr)" type="button">Sum Field</button><br>
+  
+  Individual Cost Estimate:<br>
+  <input type="number" name="individualCostEst" id="individualCostEst"><button class="smallButton" id= "sumCostEst" onclick="sumGenerator(indivCostEstArr)" type="button">Sum Field</button><br>
+  
+  Individual Benefit Actual:<br>
+  <input type="number" name="individualBenefitActual" id="individualBenefitActual"><button class="smallButton" id= "sumBenAct" onclick="sumGenerator(indivBenefitActualArr)" type="button">Sum Field</button><br>
+  
+  Individual Cost Actual:<br>
+  <input type="number" name="individualCostActual" id="individualCostActual"><button class="smallButton" id= "sumCostAct" onclick="sumGenerator(indivCostActualArr)" type="button">Sum Field</button><br>
+  
+  <button id= "addEverything" onclick="addNewStuff()" type="button" class="bigButton">Add Fields to Arrays</button><br>
+  <div id="display"></div>
+  
+  <br><br><br>
+  <button id="displayerButton" type="button" onclick= "monteCarloIterator(); displayCalculations(); displayGraph()" class="bigButton">Calculate Max, Probable, and Mean ROI Error</button><br>
+  <span id="calculateMax"></span><br>
+  <span id="calculateProb"></span><br>
+  <span id="calculateMean"></span><br>
+  <span id="percentOff"></span>
+</form>
+<canvas id="myChart" height="400" width="400"></canvas>
+
+<br><br><br><br>
+<img src="https://www.seeklogo.net/wp-content/uploads/2014/11/under-armour-eps-ai.png" style="width:100px;height:70px;"><br>
+This tool was created by Under Armour Rookie Joe Pezzulla<br>
+All formulas and calculations derived by <a href="https://arxiv.org/ftp/arxiv/papers/1404/1404.1990.pdf">Alexei Botchkarev</a>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.min.js" type="text/javascript"></script>
+    <script>
+    function displayGraph() {
+      var ctx = document.getElementById("myChart").getContext('2d');
+      var maxROI= findMaxROIError();
+      var probROI= findProbROIError();
+      var meanROI= monteCarloIterator();
+      var myChart = new Chart(ctx, {
+       type: 'bar',
+       data: {
+         labels: ["Max ROI Error", "Mean ROI Error", "Probable ROI Error"],
+         datasets: [{
+            label: 'Max ROI Error',
+            data: [maxROI, null, null],
+            backgroundColor: "rgba(255, 0, 0, 0.5)",
+            borderColor: "rgba(255, 0, 0, 1)"
+          }, {
+            label: 'Probable ROI Error',
+            data: [null, null, probROI],
+            backgroundColor: "rgba(0, 255, 0, 0.5)",
+            borderColor: "rgba(0, 255, 0, 1)"
+         }, {
+            label: 'Mean ROI Error',
+            data: [null, meanROI, null],
+            backgroundColor: "rgba(0, 0, 255, 0.5)",
+            borderColor: "rgba(0, 0, 255, 1)"
+         }]
+       }
+      });
+    }
+    
+    var adder= document.getElementById("addEverything");
+    var benEstArraySum=0;
+    var benActArraySum=0;
+    var costEstArraySum=0;
+    var costActArraySum=0;
+    var benErrArraySum=0;
+    var costErrArraySum=0;
+    
+    
+      var benEst = document.getElementById("individualBenefitEst");
+      var benAct = document.getElementById("individualBenefitActual");
+      var costEst = document.getElementById("individualCostEst");
+      var costAct = document.getElementById("individualCostActual");
+    
+    var messageBox  = document.getElementById("display");
+    
+    
+    
+    function clearAndShow () {
+      // Clear our fields
+     benEst.value = "";
+     benAct.value = "";
+     costEst.value = "";
+     costAct.value = "";
+  
+     // Show our output
+     messageBox.innerHTML = "";
+  
+     messageBox.innerHTML += "Benefit Estimates: " + indivBenefitEstArr.join(", ") + "<br/>";
+     messageBox.innerHTML += "Benefit Actuals: " + indivBenefitActualArr.join(", ") + "<br/>";
+     messageBox.innerHTML += "Cost Estimates: " + indivCostEstArr.join(", ") + "<br/>";
+     messageBox.innerHTML += "Cost Actuals: " + indivCostActualArr.join(", ");
+    }
+    
+    function addNewStuff(){
+      
+      if(benEst != null){
+        addIndivBenEst(benEst);
+        benEstArraySum+= parseInt(benEst.value);
+      }
+      if(benAct != null){
+        addIndivBenAct(benAct);
+        benActArraySum+= parseInt(benAct.value);
+      }
+      if(costEst != null){
+        addIndivCostEst(costEst);
+        costEstArraySum+= parseInt(costEst.value);
+      }
+      if(costAct != null){
+        addIndivCostAct(costAct);
+        costActArraySum+= parseInt(costAct.value);
+      }
+      if (benEst!=null && benAct!= null){
+        addIndivBenErr(benAct, benEst);
+        if((benAct-benEst)<0){
+        benErrArraySum+= ((parseInt(benAct.value)-parseInt(benEst.value))*-1);
+        }
+        else benErrArraySum+= ((parseInt(benAct.value)-parseInt(benEst.value))*-1);
+      }
+      if (costEst!=null && costAct!= null){
+        addIndivCostErr(costAct, costEst);
+        if(costAct-costEst<0){
+        costErrArraySum+= ((parseInt(costAct.value)-parseInt(costEst.value))*-1);
+        }
+        else costErrArraySum+= (parseInt(costAct.value)-parseInt(costEst.value));
+      }
+      clearAndShow();
+      
+    }
+    
+    
+    var indivBenefitEstArr= [];
+    
+    var indivCostEstArr= [];
+    
+    var indivBenefitActualArr= [];    
+  
+    var indivCostActualArr= [];
+    
+    var indivBenefitErrArr= [];
+    
+    var indivCostErrArr= [];
+    
+    
+    function displayCalculations(){
+      var maxString= "Max ROI Error: " + findMaxROIError();
+      var probString= "Probable ROI Error: " + findProbROIError();
+      document.getElementById("calculateMax").innerHTML= maxString ;
+      document.getElementById("calculateProb").innerHTML= probString ;
+      
+    }
+    
+    
+    function sumGenerator(arr){
+      var returnSum=0;
+        for (var i=0; i<arr.length; i++){
+            var x=parseInt(arr[i]);
+             returnSum=returnSum+x;
+          }
+          console.log(returnSum);
+          console.log("Total Benefits Estimate: "+ benEstArraySum);
+          console.log("Total Benefits Actual: "+ benActArraySum);
+          console.log("Total Costs Estimate: "+ costEstArraySum);
+          console.log("Total Cost Actual: "+ costActArraySum);
+          console.log("Worst Case Benefit Error: "+ benErrArraySum);
+          console.log("Worst Case Cost Error: "+ costErrArraySum);
+           return returnSum;
+        }
+    
+    function addIndivBenEst(newNum){
+      indivBenefitEstArr.push(newNum.value);
+      
+         console.log("Individual Benefits Estimates");
+         console.log(indivBenefitEstArr);
+       }
+    
+    function addIndivCostEst(newNum){
+      indivCostEstArr.push(newNum.value);
+      
+        console.log("Individual Costs Estimates");
+        console.log(indivCostEstArr);
+       }
+    
+    function addIndivBenAct(newNum){
+      indivBenefitActualArr.push(newNum.value);
+      
+       console.log("Individual Benefits Actual");
+       console.log(indivBenefitActualArr);
+        }
+    
+    function addIndivCostAct(newNum){
+      indivCostActualArr.push(newNum.value);
+      
+       console.log("Individual Costs Actual");
+       console.log(indivCostActualArr);
+        }
+    
+    function addIndivBenErr(benA, benE){
+      var x=benA.value;
+      var y=benE.value;
+      var z=x-y;
+      indivBenefitErrArr.push(z);
+       console.log("Individual Benefits Error");
+       console.log(indivBenefitErrArr);
+        }
+    
+    function addIndivCostErr(costA, costE){
+      var x= costA.value;
+      var y=costE.value;
+      var z=x-y;
+      indivCostErrArr.push(z);
+       console.log("Individual Costs Error");
+       console.log(indivCostErrArr);
+       }
+    
+    
+     function getRandomInt(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+     
+     function monteCarloSimulation(){
+        var rollingSumOne=0;
+      var returnValueOne=0;
+      for (var i=0; i<indivBenefitErrArr.length; i++){
+        var x= parseInt(indivBenefitErrArr[i]);
+        rollingSumOne= rollingSumOne+ (x*x);
+     }
+      nonWorstCaseBenefitError= Math.sqrt(rollingSumOne);
+      var rollingSumTwo=0;
+      var returnValueTwo=0;
+      for (var i=0; i<indivCostErrArr.length; i++){
+        var x= parseInt(indivCostErrArr[i]);
+        rollingSumTwo= rollingSumTwo+ (x*x);
+     }
+      nonWorstCaseCostError= Math.sqrt(rollingSumTwo);
+       var roiActual= (benActArraySum- costActArraySum)/costActArraySum;
+       var benefitsUpperBound= benActArraySum+ (benActArraySum*(nonWorstCaseBenefitError/benActArraySum));
+       var benefitsLowerBound= benActArraySum- (benActArraySum*(nonWorstCaseBenefitError/benActArraySum));
+       var randomBenEst= getRandomInt(benefitsLowerBound, benefitsUpperBound);
+       var costsUpperBound= costActArraySum+ (costActArraySum*(nonWorstCaseCostError/costActArraySum));
+       var costsLowerBound= costActArraySum- (costActArraySum*(nonWorstCaseCostError/costActArraySum));
+       var randomCostEst= getRandomInt(costsLowerBound, costsUpperBound);
+       var randomROIEst= (randomBenEst- randomCostEst)/randomCostEst;
+       var returnROI= roiActual- randomROIEst;
+       if( returnROI<0){
+         returnROI= returnROI*-1;
+         return returnROI;
+       }
+       return returnROI;
+     }
+     
+     function monteCarloIterator(){
+       var rollingSum= 0;
+       for (var i=0; i <=30000; i++){
+         rollingSum+= monteCarloSimulation();
+       }
+       var returnMean= (rollingSum)/30000;
+       document.getElementById("calculateMean").innerHTML= "Mean ROI Error from Monte Carlo Simulation: " + returnMean;
+       document.getElementById("percentOff").innerHTML= "Percent of ROI Off: " + ((returnMean/(benEstArraySum-costEstArraySum))*100)+ "%";
+       return returnMean;
+     }
+      
+    
+    function findMaxROIError() {
+    var maxROIError= (benEstArraySum/costEstArraySum)*((benErrArraySum/benEstArraySum)+(costErrArraySum/costEstArraySum));
+    return maxROIError;
+    }
+    function findProbROIError() {
+      var rollingSumOne=0;
+      var returnValueOne=0;
+      for (var i=0; i<indivBenefitErrArr.length; i++){
+        var x= parseInt(indivBenefitErrArr[i]);
+        rollingSumOne= rollingSumOne+ (x*x);
+     }
+      nonWorstCaseBenefitError= Math.sqrt(rollingSumOne);
+      var rollingSumTwo=0;
+      var returnValueTwo=0;
+      for (var i=0; i<indivCostErrArr.length; i++){
+        var x= parseInt(indivCostErrArr[i]);
+        rollingSumTwo= rollingSumTwo+ (x*x);
+     }
+      nonWorstCaseCostError= Math.sqrt(rollingSumTwo);
+    var probableROIError= (benEstArraySum/costEstArraySum)*(Math.sqrt((nonWorstCaseBenefitError/benEstArraySum)*(nonWorstCaseBenefitError/benEstArraySum))+(nonWorstCaseCostError/costEstArraySum)*(nonWorstCaseCostError/costEstArraySum));
+    return probableROIError;
+    }
+                     
+    
+    </script>
+  </body>
+</html>
